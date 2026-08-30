@@ -1,3 +1,5 @@
+import datetime
+
 import numpy as np
 
 np.random.seed(42)
@@ -10,6 +12,7 @@ def get_data(n: int, start: int, stop: int, a: float, b: float):
 
 
 if __name__ == "__main__":
+    _start = datetime.datetime.now()
     # 1. Данные
     n = 100
     true_a = 2.5
@@ -19,8 +22,8 @@ if __name__ == "__main__":
     # 2. инициализация
     a = 0.0
     b = 0.0
-    lr = 0.001  # learning rate (шаг)
-    epochs = 10000
+    lr = 0.0001  # learning rate (шаг)
+    epochs = 10_000
 
     # 3 обучение
     for epoch in range(epochs):
@@ -57,6 +60,8 @@ if __name__ == "__main__":
             print(f"epoch {epoch}: a = {a:.4f}, b = {b:.4f}, MSE = {mse:.6f}")
 
     # 4. Результат:
+    _finish = datetime.datetime.now()
     print("\n" + "=" * 30)
     print(f"истинные значения: a = {true_a}, b = {true_b}")
     print(f"найденные значения: a = {a:.5f}, b = {b:.5f}")
+    print(f"time - {(_finish - _start)}")
