@@ -98,7 +98,7 @@ def solve_by_numpy(kind: str):
     print("=" * 10 + f" solve by {kind} by numpy " + "=" * 10)
     X, Y = source()
     w = np.zeros((X.shape[1], 1))
-    solver
+    solver = epoch_solver(kind)
 
     lr = 0.05
     epochs = 50_000
