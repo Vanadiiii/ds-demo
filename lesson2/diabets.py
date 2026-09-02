@@ -1,6 +1,9 @@
+from collections.abc import Callable
+
 import numpy as np
 from numpy._core import float64
 from numpy.typing import NDArray
+from pandas.core.generic import FloatFormatType
 from sklearn.datasets import load_diabetes  # pyright:ignore[reportMissingTypeStubs]
 from sklearn.linear_model import LinearRegression, SGDRegressor
 from sklearn.metrics import r2_score
@@ -22,24 +25,90 @@ def source() -> tuple[NDArray[float64], NDArray[float64]]:
     return x, y.reshape(-1, 1)
 
 
-def solve_numpy_lgd():
-    print("=" * 10 + " lgd by numpy " + "=" * 10)
+def __check_input(x: NDArray[float64], y: NDArray[float64], w: NDArray[float64]):
+    if x.shape[0] != y.shape[0]:
+        raise Exception(f"incorrect shape: x({x.shape}), y({y.shape})")
+    if x.shape[1] != w.shape[0]:
+        raise Exception(f"incorrect shape: x({x.shape}), w({w.shape})")
+    if y.shape[1] != 1 or w.shape[1] != 1:
+        raise Exception(f"incorrect shape: y({y.shape}), w({w.shape})")
+
+
+def lgd_solver(
+    x: NDArray[float64], y: NDArray[float64], w: NDArray[float64], **kwargs
+) -> None:
+    __check_input(x, y, w)
+
+    lr = kwargs.get("lr", 0.05)
+
+    grad = x.T @ (x @ w - y) / len(y)
+    w -= lr * grad
+
+
+def sgd_solver(
+    x: NDArray[float64], y: NDArray[float64], w: NDArray[float64], **kwargs
+) -> None:
+    __check_input(x, y, w)
+    lr = kwargs.get("lr", 0.05)
+    rnd = kwargs.get("rnd", np.random.default_rng())
+
+    # выбираем рандомную строку и вычисляем градиент ТОЛЬКО по ней..
+    i: int = rnd.integers(0, x.shape[0])
+    grad_i = x[i].reshape((-1, 1)) @ (x[i] @ w - y[i])
+    w -= lr * grad_i.reshape((-1, 1))
+
+
+def mini_batch_solver(
+    x: NDArray[float64], y: NDArray[float64], w: NDArray[float64], **kwargs
+) -> None:
+    __check_input(x, y, w)
+    lr = kwargs.get("lr", 0.05)
+    rnd = kwargs.get("rnd", np.random.default_rng())
+    batch_size = kwargs.get("batch_size", 10)
+
+    def get_batch_indexes() -> list[int]:
+        res: set[int] = set()
+        while len(res) < batch_size:
+            res.add(rnd.integers(0, x.shape[0]))
+
+        return list(res)
+
+    # выбираем рандомные строки (mini-batch) и вычисляем градиент ТОЛЬКО по ним..
+    ii = get_batch_indexes()
+    x_batch = x[ii]
+    grad_ii = x_batch.T @ (x_batch @ w - y[ii])
+    w -= lr * grad_ii
+
+
+def epoch_solver(kind: str | None):
+    if kind is None:
+        kind = "lgd"
+    kind = kind.lower()
+    if kind == "lgd":
+        return lgd_solver
+    elif kind == "sgd":
+        return sgd_solver
+    elif kind == "mini_batch":
+        return mini_batch_solver
+    else:
+        raise Exception("unknown solver kind")
+
+
+def solve_by_numpy(kind: str):
+    print("=" * 10 + f" solve by {kind} by numpy " + "=" * 10)
     X, Y = source()
     w = np.zeros((X.shape[1], 1))
+    solver
 
-    epochs = 50_000
     lr = 0.05
-
+    epochs = 50_000
     for _ in range(epochs):
-        grad = X.T @ (X @ w - Y) / len(Y)
-        w -= lr * grad
+        solver(X, Y, w, lr=lr)
 
-    # SGD ( -> 1 - sum((y_real - y_pred)**2) / sum((y_read - y_mean)**2))
     sgd = 1 - (
         np.sum(np.square(Y - X @ w)) / np.sum(np.square(Y - np.full(Y.shape, Y.mean())))
     )
-    # or sklearn.metrics.r2_score(Y, X @ w) # it's easy))
-    print(sgd)  # 0.5 - it's good for medical info!!
+    print(sgd)
 
     print(w.tolist())
 
@@ -58,26 +127,7 @@ def solve_sklearn_lgd():
     print(w.tolist())
 
 
-def solve_numpy_sgd():
-    print("=" * 10 + " sgd by numpy " + "=" * 10)
-    X, Y = source()
-    w = np.zeros((X.shape[1], 1))
-
-    epochs = 50_000
-    lr = 0.05
-
-    rnd = np.random.default_rng()
-    for _ in range(epochs):
-        # выбираем рандомную строку и вычисляем градиент ТОЛЬКО по ней..
-        i: int = rnd.integers(0, X.shape[0])
-        grad_i = X[i].reshape((-1, 1)) @ (X[i] @ w - Y[i])
-        w -= lr * grad_i.reshape((-1, 1))
-
-    sgd = r2_score(Y, X @ w)
-    print(sgd)  # 0.5 !!! wow, it's works!!!
-    print(w.tolist())
-
-
+# todo - fix!!
 def solve_sklearn_sgd():
     print("=" * 10 + " sgd by sklearn " + "=" * 10)
     X, Y = source()
@@ -100,8 +150,4 @@ def solve_sklearn_sgd():
 
 
 if __name__ == "__main__":
-    # solve_numpy_lgd()
-    # print()
-    # solve_sklearn_lgd()
-    # print()
-    solve_sklearn_sgd()
+    solve_by_numpy("mini_batch")
